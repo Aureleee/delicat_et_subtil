@@ -1,0 +1,26 @@
+from .unidepth_loader import (
+    NODE_CLASS_MAPPINGS as _LOADER_CLASSES,
+    NODE_DISPLAY_NAME_MAPPINGS as _LOADER_NAMES,
+)
+from .unidepth_inference import (
+    NODE_CLASS_MAPPINGS as _INFER_CLASSES,
+    NODE_DISPLAY_NAME_MAPPINGS as _INFER_NAMES,
+)
+from .unidepth_visualizer import (
+    NODE_CLASS_MAPPINGS as _VIZ_CLASSES,
+    NODE_DISPLAY_NAME_MAPPINGS as _VIZ_NAMES,
+)
+
+NODE_CLASS_MAPPINGS = {
+    **_LOADER_CLASSES,
+    **_INFER_CLASSES,
+    **_VIZ_CLASSES,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    **_LOADER_NAMES,
+    **_INFER_NAMES,
+    **_VIZ_NAMES,
+}
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

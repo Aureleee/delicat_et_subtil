@@ -1,0 +1,8 @@
+torch
+numpy
+opencv-python
+Pillow
+huggingface_hub
+# UniDepth doit être installé manuellement depuis le zip :
+# pip install -e /chemin/vers/UniDepth-main/
+# (ou pip install git+https://github.com/lpiccinelli-eth/UniDepth.git)
