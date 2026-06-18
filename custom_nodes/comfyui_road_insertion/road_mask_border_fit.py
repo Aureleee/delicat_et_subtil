@@ -5,8 +5,9 @@ RoadMaskBorderFit
 2. Scan bord gauche / bord droit ligne par ligne
 3. Régression linéaire sur des fenêtres glissantes → petits segments
 4. Merge des segments proches et alignés
-5. Garde les 2 plus longs (un gauche, un droit)
-→ Sort LINE_SEGMENTS compatible avec Road Gravity Sampler
+5. Retourne TOUS les segments mergés (gauche + droite), ordonnés bas→haut
+   + les données brutes de scan pour la polyligne complète
+→ Sort LINE_SEGMENTS compatible avec Road Gravity Sampler (polyline mode)
 """
 
 import numpy as np
@@ -25,7 +26,6 @@ def _np2t(a):
     return torch.from_numpy(a.astype(np.float32) / 255.0).unsqueeze(0)
 
 def _extract_mask(rgb, thr):
-    """Accepte masque vert (SAM) ou masque blanc/noir binaire."""
     r = rgb[:, :, 0].astype(np.int16)
     g = rgb[:, :, 1].astype(np.int16)
     b = rgb[:, :, 2].astype(np.int16)
@@ -61,10 +61,6 @@ def _scan_borders(mask):
 # ─── 3. Petits segments par fenêtre glissante ─────────────────────────────────
 
 def _windowed_segments(rows, xs, window, step):
-    """
-    Régression linéaire sur des fenêtres de `window` lignes, avançant de `step`.
-    Retourne liste de np.array([[x0,y0],[x1,y1]]).
-    """
     segs = []
     n = len(rows)
     i = 0
@@ -95,21 +91,14 @@ def _angle_diff(a, b):
     return min(d, 180.0 - d)
 
 def _merge_segments(segs, angle_tol, gap_tol):
-    """
-    Fusionne les segments consécutifs dont l'angle diffère de moins de angle_tol
-    et dont le gap vertical est inférieur à gap_tol.
-    """
     if not segs:
         return []
-    # Trier par y de départ
     segs = sorted(segs, key=lambda s: s[0, 1])
     merged = [segs[0].copy()]
     for s in segs[1:]:
         prev = merged[-1]
         gap = float(s[0, 1] - prev[1, 1])
         if gap <= gap_tol and _angle_diff(_seg_angle(prev), _seg_angle(s)) <= angle_tol:
-            # Prolonger le segment précédent jusqu'à la fin de s
-            # Refaire une régression sur l'union des deux... simplement on étend
             merged[-1][1] = s[1].copy()
         else:
             merged.append(s.copy())
@@ -125,62 +114,65 @@ def _seg_len(s):
 # ─── 6. Prolonger un segment jusqu'à un y-range cible ───────────────────────
 
 def _extend_segment(seg, target_y_min, target_y_max):
-    """
-    Prolonge `seg` géométriquement pour couvrir [target_y_min, target_y_max] en Y.
-    Suit simplement la pente du segment, sans vérification de masque.
-    """
     s = seg.copy().astype(np.float32)
-
-    # S'assurer que s[0] est le point le plus haut (y le plus petit)
     if s[0, 1] > s[1, 1]:
         s = s[::-1].copy()
-
     dy = s[1, 1] - s[0, 1]
     dx = s[1, 0] - s[0, 0]
     if abs(dy) < 1e-6:
-        return s  # segment horizontal, pas de prolongation
-
-    slope = dx / dy  # dX par dY
-
-    # Prolonger vers le haut
+        return s
+    slope = dx / dy
     if s[0, 1] > target_y_min:
         delta = s[0, 1] - target_y_min
         s[0] = np.array([s[0, 0] - slope * delta, target_y_min], np.float32)
-
-    # Prolonger vers le bas
     if s[1, 1] < target_y_max:
         delta = target_y_max - s[1, 1]
         s[1] = np.array([s[1, 0] + slope * delta, target_y_max], np.float32)
-
     return s
 
 
 # ─── debug ────────────────────────────────────────────────────────────────────
 
-def _draw_debug(rgb, road_mask, all_l, all_r, best_l, best_r):
+def _seg_mid_y(s):
+    return (s[0, 1] + s[1, 1]) / 2.0
+
+def _draw_debug(rgb, road_mask, sorted_l, sorted_r, best_l, best_r):
     vis = rgb.copy()
-    # Colorier la route retenue en vert
     vis[road_mask > 0] = np.clip(
         vis[road_mask > 0].astype(np.float32) * 0.35
         + np.array([20, 180, 50]) * 0.65, 0, 255).astype(np.uint8)
 
-    # Tous les petits segments : gris
-    for s in all_l + all_r:
-        cv2.line(vis, tuple(np.round(s[0]).astype(int)),
-                 tuple(np.round(s[1]).astype(int)), (80, 80, 80), 1, cv2.LINE_AA)
+    # Dessiner tous les segments avec un gradient de couleur bas→haut
+    # Gauche: dégradé orange→jaune, Droite: dégradé bleu→cyan
+    def draw_all_segs(segs, color_bottom, color_top):
+        n = len(segs)
+        for i, s in enumerate(segs):
+            t = i / max(n - 1, 1)  # 0=bottom, 1=top
+            c = tuple(int(color_bottom[k] * (1 - t) + color_top[k] * t) for k in range(3))
+            p0 = tuple(np.round(s[0]).astype(int))
+            p1 = tuple(np.round(s[1]).astype(int))
+            cv2.line(vis, p0, p1, c, 2, cv2.LINE_AA)
+            # Numéro de section
+            mid = ((p0[0] + p1[0]) // 2, (p0[1] + p1[1]) // 2)
+            cv2.putText(vis, str(i), mid, cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                        (255, 255, 255), 1, cv2.LINE_AA)
 
-    # Meilleurs segments
-    def draw_seg(seg, color):
+    # sorted_l et sorted_r sont déjà ordonnés bottom→top
+    draw_all_segs(sorted_l, (255, 140, 0), (255, 255, 0))   # orange→jaune
+    draw_all_segs(sorted_r, (0, 100, 255), (0, 240, 255))   # bleu→cyan
+
+    # Meilleur segment (le plus long) en surbrillance
+    def draw_best(seg, color):
         if seg is None:
             return
         p0 = tuple(np.round(seg[0]).astype(int))
         p1 = tuple(np.round(seg[1]).astype(int))
-        cv2.line(vis, p0, p1, color, 3, cv2.LINE_AA)
+        cv2.line(vis, p0, p1, color, 4, cv2.LINE_AA)
         cv2.circle(vis, p0, 6, color, -1, cv2.LINE_AA)
         cv2.circle(vis, p1, 6, color, -1, cv2.LINE_AA)
 
-    draw_seg(best_l, (255, 140, 0))   # orange = gauche
-    draw_seg(best_r, (0, 160, 255))   # bleu   = droite
+    draw_best(best_l, (255, 140, 0))
+    draw_best(best_r, (0, 160, 255))
 
     cv2.putText(vis, "left border",  (10, 24), cv2.FONT_HERSHEY_SIMPLEX,
                 0.6, (255, 140, 0), 2, cv2.LINE_AA)
@@ -205,26 +197,23 @@ class RoadMaskBorderFit:
             },
             "optional": {
                 "green_threshold": ("INT", {
-                    "default": 80, "min": 10, "max": 200, "step": 5,
-                    "tooltip": "Seuil pour masque vert. Ignoré pour masques B&W."}),
+                    "default": 80, "min": 10, "max": 200, "step": 5}),
                 "window_rows": ("INT", {
                     "default": 40, "min": 5, "max": 300, "step": 5,
-                    "tooltip": "Taille de la fenêtre glissante (lignes) pour chaque mini-régression."}),
+                    "tooltip": "Taille de la fenêtre glissante pour chaque mini-régression."}),
                 "step_rows": ("INT", {
-                    "default": 10, "min": 1, "max": 100, "step": 1,
-                    "tooltip": "Pas d'avancement de la fenêtre glissante."}),
+                    "default": 10, "min": 1, "max": 100, "step": 1}),
                 "merge_angle_deg": ("FLOAT", {
                     "default": 8.0, "min": 0.5, "max": 45.0, "step": 0.5,
-                    "tooltip": "Angle max (°) entre deux segments consécutifs pour les fusionner."}),
+                    "tooltip": "Angle max (°) entre deux segments pour les fusionner."}),
                 "merge_gap_rows": ("INT", {
                     "default": 15, "min": 0, "max": 200, "step": 1,
-                    "tooltip": "Gap vertical max (lignes) entre deux segments pour les fusionner."}),
+                    "tooltip": "Gap vertical max (lignes) pour fusionner deux segments."}),
                 "min_road_pixels": ("INT", {
                     "default": 100, "min": 10, "max": 100000, "step": 10}),
                 "extend_to_equal": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Prolonge le segment le plus court pour qu'il atteigne "
-                               "le même y-range que le plus long, en restant dans le masque route."}),
+                    "tooltip": "Prolonge le segment le plus court pour couvrir le même y-range."}),
             },
         }
 
@@ -235,7 +224,10 @@ class RoadMaskBorderFit:
 
         rgb  = _t2np(mask_image)
         H, W = rgb.shape[:2]
-        empty_lines = {"lines": np.zeros((0, 2, 2), np.float32), "width": W, "height": H}
+        empty_lines = {"lines": np.zeros((0, 2, 2), np.float32),
+                       "left_segs": [], "right_segs": [],
+                       "rows": np.zeros(0), "left_x": np.zeros(0), "right_x": np.zeros(0),
+                       "width": W, "height": H}
 
         # ── 1. Masque + plus grand composant connexe ──────────────────────────
         mask = _extract_mask(rgb, green_threshold)
@@ -266,13 +258,16 @@ class RoadMaskBorderFit:
         merged_l = _merge_segments(raw_l, merge_angle_deg, merge_gap_rows)
         merged_r = _merge_segments(raw_r, merge_angle_deg, merge_gap_rows)
 
-        # ── 5. Garder le plus long de chaque côté ─────────────────────────────
+        # ── 5. Trier tous les segments bottom→top (Y décroissant) ─────────────
+        # position 0 = bas de l'image (Y max), position 1 = haut (Y min)
+        sorted_l = sorted(merged_l, key=lambda s: -_seg_mid_y(s))
+        sorted_r = sorted(merged_r, key=lambda s: -_seg_mid_y(s))
+
         best_l = max(merged_l, key=_seg_len) if merged_l else None
         best_r = max(merged_r, key=_seg_len) if merged_r else None
 
         # ── 6. Extension égale (optionnel) ────────────────────────────────────
         if extend_to_equal and best_l is not None and best_r is not None:
-            # y-range union des deux segments
             yl0 = min(best_l[0, 1], best_l[1, 1])
             yl1 = max(best_l[0, 1], best_l[1, 1])
             yr0 = min(best_r[0, 1], best_r[1, 1])
@@ -284,17 +279,30 @@ class RoadMaskBorderFit:
 
         kept = [s for s in [best_l, best_r] if s is not None]
         lines_arr = np.stack(kept, axis=0) if kept else np.zeros((0, 2, 2), np.float32)
-        border_lines = {"lines": lines_arr, "width": W, "height": H}
+
+        border_lines = {
+            # Backward compat : les 2 meilleurs segments
+            "lines": lines_arr,
+            # Nouveau : tous les segments ordonnés bas→haut
+            "left_segs":  sorted_l,
+            "right_segs": sorted_r,
+            # Données brutes du scan (polyligne complète, triées top→bottom = Y croissant)
+            "rows":   rows,
+            "left_x": left_x,
+            "right_x": right_x,
+            "width":  W,
+            "height": H,
+        }
 
         # ── 7. Debug ───────────────────────────────────────────────────────────
         vis_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        vis_bgr = _draw_debug(vis_bgr, mask, merged_l, merged_r, best_l, best_r)
+        vis_bgr = _draw_debug(vis_bgr, mask, sorted_l, sorted_r, best_l, best_r)
 
         summary = (f"RoadMaskBorderFit | {n_px} px | "
-                   f"L: {len(merged_l)} segs → best {_seg_len(best_l):.0f}px | "
-                   f"R: {len(merged_r)} segs → best {_seg_len(best_r):.0f}px"
+                   f"L: {len(sorted_l)} segs ??? best {_seg_len(best_l):.0f}px | "
+                   f"R: {len(sorted_r)} segs ??? best {_seg_len(best_r):.0f}px"
                    if best_l is not None and best_r is not None
-                   else f"{n_px} px | L:{len(merged_l)} R:{len(merged_r)}")
+                   else f"{n_px} px | L:{len(sorted_l)} R:{len(sorted_r)}")
 
         cv2.putText(vis_bgr, summary[:90], (8, H - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1, cv2.LINE_AA)

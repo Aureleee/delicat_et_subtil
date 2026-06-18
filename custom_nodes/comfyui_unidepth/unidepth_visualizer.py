@@ -275,6 +275,24 @@ class UniDepthRoadWidth:
 
         seg_l, seg_r = lines[0], lines[1]
 
+        # ── Normale perpendiculaire à la route ────────────────────────────────
+        # Direction moyenne des deux bords → normale = rotation 90°
+        def seg_dir_norm(seg):
+            d = seg[1] - seg[0]
+            n = np.linalg.norm(d)
+            return d / n if n > 1e-6 else d
+
+        dir_l = seg_dir_norm(seg_l)
+        dir_r = seg_dir_norm(seg_r)
+        if np.dot(dir_l, dir_r) < 0:
+            dir_r = -dir_r
+        road_dir = (dir_l + dir_r) / 2.0
+        road_dir /= np.linalg.norm(road_dir) + 1e-9
+        # Normale à la route (perpendiculaire, pointant vers la droite)
+        road_perp = np.array([road_dir[1], -road_dir[0]])  # rotation -90°
+        if road_perp[0] < 0:
+            road_perp = -road_perp  # toujours vers x positif
+
         # Tracer les bords
         def draw_seg(s, color, label):
             p0 = tuple(np.round(s[0]).astype(int))
@@ -326,13 +344,20 @@ class UniDepthRoadWidth:
                 lines_out.append(f"y={y:4d}  xl={xl:.0f} xr={xr:.0f}  depth=N/A")
                 continue
 
-            # Largeur en mètres : w = depth * (xr - xl) / fx
-            dx_px = xr - xl
-            width_m = d * dx_px / fx
-            width_std = std * dx_px / fx  # propagation d'erreur
+            # Vecteur pixel entre les deux bords (horizontal à ce niveau y)
+            delta_px = np.array([xr - xl, 0.0])
+            # Projection sur la normale à la route = vraie largeur perpendiculaire
+            perp_px = abs(float(np.dot(delta_px, road_perp)))
 
-            # Dessiner la ligne de mesure
-            cv2.line(vis, (xli, y), (xri, y), (0, 255, 255), 1, cv2.LINE_AA)
+            width_m = d * perp_px / fx
+            width_std = std * perp_px / fx
+
+            # Dessiner la ligne de mesure perpendiculaire (pas horizontale)
+            # Point gauche et droite sur la perpendiculaire passant par le centre
+            half = road_perp * perp_px / 2.0
+            pl = (int(xc - half[0]), int(y - half[1]))
+            pr = (int(xc + half[0]), int(y + half[1]))
+            cv2.line(vis, pl, pr, (0, 255, 255), 1, cv2.LINE_AA)
             cv2.circle(vis, (xli, y), 4, (255, 140, 0), -1, cv2.LINE_AA)
             cv2.circle(vis, (xri, y), 4, (0, 160, 255), -1, cv2.LINE_AA)
 
@@ -344,7 +369,7 @@ class UniDepthRoadWidth:
 
             lines_out.append(
                 f"y={y:4d}  xl={xl:6.1f} xr={xr:6.1f}  "
-                f"dx={dx_px:5.1f}px  depth={d:.2f}m  largeur={width_m:.2f}m ±{width_std:.2f}"
+                f"perp={perp_px:5.1f}px  depth={d:.2f}m  largeur⊥={width_m:.2f}m ±{width_std:.2f}"
             )
 
         # Légende

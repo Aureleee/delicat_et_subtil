@@ -180,7 +180,7 @@ class BlenderTankRender:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model_3d_path":          ("STRING",  {"default": "/Users/aurele/Downloads/t-14_armata.glb"}),
+                "model_3d_path":          ("STRING",  {"default": r"C:\Users\aurel\Downloads\t-14_armata.glb"}),
                 "tank_rot_z":             ("FLOAT",   {"default": 0.0,  "min": -360.0, "max": 360.0, "step": 1.0}),
                 "camera_azimuth":         ("FLOAT",   {"default": 45.0, "min": -360.0, "max": 360.0, "step": 1.0}),
                 "camera_elevation":       ("FLOAT",   {"default": 15.0, "min": -89.0,  "max": 89.0,  "step": 1.0}),
@@ -189,7 +189,7 @@ class BlenderTankRender:
                 "samples":                ("INT",     {"default": 128,  "min": 1,      "max": 1024,  "step": 1}),
                 "transparent_background": ("BOOLEAN", {"default": True}),
                 "plain_material":         ("BOOLEAN", {"default": True}),
-                "blender_path":           ("STRING",  {"default": "/Applications/Blender.app/Contents/MacOS/Blender"}),
+                "blender_path":           ("STRING",  {"default": r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe"}),
             },
             "optional": {"orientation": ("STRING", {"forceInput": True})},
         }
@@ -239,7 +239,7 @@ class BlenderTankEuler:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "model_3d_path":   ("STRING",  {"default": "/Users/aurele/Downloads/t-14_armata.glb"}),
+            "model_3d_path":   ("STRING",  {"default": r"C:\Users\aurel\Downloads\t-14_armata.glb"}),
             "euler_z": ("FLOAT",{"default":0.0,"min":-360.,"max":360.,"step":1.,"tooltip":"Yaw (0=face +Y)"}),
             "euler_x": ("FLOAT",{"default":0.0,"min":-180.,"max":180.,"step":1.}),
             "euler_y": ("FLOAT",{"default":0.0,"min":-180.,"max":180.,"step":1.}),
@@ -250,7 +250,7 @@ class BlenderTankEuler:
             "samples":         ("INT",  {"default":32,  "min":1,    "max":1024,"step":1}),
             "transparent_background":("BOOLEAN",{"default":True}),
             "plain_material":  ("BOOLEAN",{"default":True}),
-            "blender_path":    ("STRING",{"default":"/Applications/Blender.app/Contents/MacOS/Blender"}),
+            "blender_path":    ("STRING",{"default":r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe"}),
         }}
     RETURN_TYPES=("IMAGE",); RETURN_NAMES=("image",); FUNCTION="render"; CATEGORY="Blender/Debug"
 
@@ -283,7 +283,7 @@ class BlenderTankVectors:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "model_3d_path": ("STRING",{"default":"/Users/aurele/Downloads/t-14_armata.glb"}),
+            "model_3d_path": ("STRING",{"default":r"C:\Users\aurel\Downloads\t-14_armata.glb"}),
             "forward_x":("FLOAT",{"default":0.0,"min":-1.,"max":1.,"step":0.01}),
             "forward_y":("FLOAT",{"default":1.0,"min":-1.,"max":1.,"step":0.01}),
             "forward_z":("FLOAT",{"default":0.0,"min":-1.,"max":1.,"step":0.01}),
@@ -298,7 +298,7 @@ class BlenderTankVectors:
             "samples":("INT",{"default":32,"min":1,"max":1024,"step":1}),
             "transparent_background":("BOOLEAN",{"default":True}),
             "plain_material":("BOOLEAN",{"default":True}),
-            "blender_path":("STRING",{"default":"/Applications/Blender.app/Contents/MacOS/Blender"}),
+            "blender_path":("STRING",{"default":r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe"}),
         }}
     RETURN_TYPES=("IMAGE",); RETURN_NAMES=("image",); FUNCTION="render"; CATEGORY="Blender/Debug"
 
@@ -348,7 +348,7 @@ class BlenderPerspectiveRender:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "model_3d_path":   ("STRING", {"default": "/Users/aurele/Downloads/t-14_armata.glb"}),
+            "model_3d_path":   ("STRING", {"default": r"C:\Users\aurel\Downloads\t-14_armata.glb"}),
             "up_vector_3d":    ("GRAVITY_FIELD",),
             "road_vector_2d":  ("GRAVITY_FIELD",),
             "latitude_deg":    ("FLOAT", {"forceInput": True,
@@ -366,7 +366,7 @@ class BlenderPerspectiveRender:
             "samples":         ("INT",   {"default":128,"min":1,"max":1024,"step":1}),
             "transparent_background":("BOOLEAN",{"default":True}),
             "plain_material":  ("BOOLEAN",{"default":False}),
-            "blender_path":    ("STRING",{"default":"/Applications/Blender.app/Contents/MacOS/Blender"}),
+            "blender_path":    ("STRING",{"default":r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe"}),
         }}
     RETURN_TYPES=("IMAGE",); RETURN_NAMES=("image",); FUNCTION="render"; CATEGORY="Blender"
 

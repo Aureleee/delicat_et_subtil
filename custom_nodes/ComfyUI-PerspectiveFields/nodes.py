@@ -111,7 +111,6 @@ class RoadGravitySampler:
 
     def sample(self, border_lines, gravity_field, latitude_field, road_position,
                arrow_scale, background_image=None):
-        lines = np.asarray(border_lines["lines"], np.float32)
         W = border_lines["width"]
         H = border_lines["height"]
 
@@ -124,43 +123,122 @@ class RoadGravitySampler:
         else:
             debug = np.zeros((H, W, 3), np.uint8)
 
-        if len(lines) == 0:
-            out = cv2.cvtColor(debug, cv2.COLOR_BGR2RGB)
-            return (
-                torch.zeros(3), torch.zeros(2), torch.zeros(2), 0.0,
-                W // 2, H // 2,
-                torch.from_numpy(out.astype(np.float32) / 255.0).unsqueeze(0),
-            )
+        # ── Mode polyligne (nouvelles données brutes de scan) ─────────────────
+        has_polyline = ("rows" in border_lines and
+                        len(border_lines.get("rows", [])) > 1)
 
-        lengths = np.hypot(lines[:, 1, 0] - lines[:, 0, 0],
-                           lines[:, 1, 1] - lines[:, 0, 1])
-        order = np.argsort(lengths)[::-1]
-        seg_a = lines[order[0]]
-        seg_b = lines[order[1]] if len(lines) > 1 else seg_a
+        if has_polyline:
+            raw_rows  = np.asarray(border_lines["rows"],   np.float32)   # top→bottom (Y croissant)
+            raw_left  = np.asarray(border_lines["left_x"], np.float32)
+            raw_right = np.asarray(border_lines["right_x"],np.float32)
 
-        cx_a = (seg_a[0, 0] + seg_a[1, 0]) * 0.5
-        cx_b = (seg_b[0, 0] + seg_b[1, 0]) * 0.5
-        if cx_a <= cx_b:
-            left_seg, right_seg = seg_a, seg_b
+            # Centre de la route à chaque ligne
+            center_x = (raw_left + raw_right) * 0.5
+            center_y = raw_rows
+
+            # Inverser : index 0 = bas de l'image (Y max), index -1 = haut (Y min)
+            # position=0 → bas/proche caméra, position=1 → haut/loin
+            cx = center_x[::-1].copy()
+            cy = center_y[::-1].copy()
+            lx = raw_left[::-1].copy()
+            rx = raw_right[::-1].copy()
+
+            # Arc length cumulée
+            dx = np.diff(cx); dy = np.diff(cy)
+            seg_lens = np.hypot(dx, dy)
+            arc = np.concatenate([[0.0], np.cumsum(seg_lens)])
+            total_arc = float(arc[-1])
+
+            if total_arc < 1.0:
+                px, py = W // 2, H // 2
+                road_dir = np.array([0.0, 1.0])
+            else:
+                target = float(road_position) * total_arc
+                idx = int(np.searchsorted(arc, target, side='right')) - 1
+                idx = int(np.clip(idx, 0, len(arc) - 2))
+                t_loc = (target - arc[idx]) / max(arc[idx+1] - arc[idx], 1e-9)
+
+                px = float(cx[idx] + t_loc * (cx[idx+1] - cx[idx]))
+                py = float(cy[idx] + t_loc * (cy[idx+1] - cy[idx]))
+                px = int(np.clip(round(px), 0, W - 1))
+                py = int(np.clip(round(py), 0, H - 1))
+
+                # Direction locale = tangente de la polyligne (fenêtre ±3 points)
+                i0 = max(0, idx - 3)
+                i1 = min(len(cx) - 1, idx + 4)
+                rdx = cx[i1] - cx[i0]
+                rdy = cy[i1] - cy[i0]
+                n = math.hypot(rdx, rdy)
+                road_dir = np.array([rdx, rdy]) / n if n > 1e-6 else np.array([0.0, 1.0])
+
+            # Dessiner la polyligne centrale en vert gradient
+            n_pts = len(cx)
+            for i in range(n_pts - 1):
+                t = i / max(n_pts - 2, 1)
+                col = (int(255 * (1 - t)), int(200 * t + 55), 80)
+                p0 = (int(cx[i]),   int(cy[i]))
+                p1 = (int(cx[i+1]), int(cy[i+1]))
+                cv2.line(debug, p0, p1, col, 1, cv2.LINE_AA)
+
+            # Dessiner les bords (gauche=orange, droite=bleu) en polylignes
+            for i in range(len(lx) - 1):
+                cv2.line(debug,
+                         (int(lx[i]), int(cy[i])), (int(lx[i+1]), int(cy[i+1])),
+                         (255, 140, 0), 1, cv2.LINE_AA)
+                cv2.line(debug,
+                         (int(rx[i]), int(cy[i])), (int(rx[i+1]), int(cy[i+1])),
+                         (0, 160, 255), 1, cv2.LINE_AA)
+
+            pt = np.array([float(px), float(py)])
+
         else:
-            left_seg, right_seg = seg_b, seg_a
+            # ── Mode legacy : 2 segments ──────────────────────────────────────
+            lines = np.asarray(border_lines["lines"], np.float32)
+            if len(lines) == 0:
+                out = cv2.cvtColor(debug, cv2.COLOR_BGR2RGB)
+                return (torch.zeros(3), torch.zeros(2), torch.zeros(2), 0.0,
+                        W // 2, H // 2,
+                        torch.from_numpy(out.astype(np.float32) / 255.0).unsqueeze(0))
 
-        def orient_by_y(seg):
-            return seg if seg[0, 1] <= seg[1, 1] else seg[::-1]
-        left_seg  = orient_by_y(left_seg)
-        right_seg = orient_by_y(right_seg)
+            lengths = np.hypot(lines[:, 1, 0] - lines[:, 0, 0],
+                               lines[:, 1, 1] - lines[:, 0, 1])
+            order = np.argsort(lengths)[::-1]
+            seg_a = lines[order[0]]
+            seg_b = lines[order[1]] if len(lines) > 1 else seg_a
 
-        start_mid = (left_seg[0] + right_seg[0]) * 0.5
-        end_mid   = (left_seg[1] + right_seg[1]) * 0.5
-        pt  = start_mid * (1.0 - road_position) + end_mid * road_position
-        px  = int(np.clip(round(pt[0]), 0, W - 1))
-        py  = int(np.clip(round(pt[1]), 0, H - 1))
+            cx_a = (seg_a[0, 0] + seg_a[1, 0]) * 0.5
+            cx_b = (seg_b[0, 0] + seg_b[1, 0]) * 0.5
+            left_seg, right_seg = (seg_a, seg_b) if cx_a <= cx_b else (seg_b, seg_a)
 
+            def orient_by_y(seg):
+                return seg if seg[0, 1] <= seg[1, 1] else seg[::-1]
+            left_seg  = orient_by_y(left_seg)
+            right_seg = orient_by_y(right_seg)
+
+            # Legacy: position=0 → bas (end), position=1 → haut (start)
+            end_mid   = (left_seg[1] + right_seg[1]) * 0.5
+            start_mid = (left_seg[0] + right_seg[0]) * 0.5
+            pt = end_mid * (1.0 - road_position) + start_mid * road_position
+            px = int(np.clip(round(pt[0]), 0, W - 1))
+            py = int(np.clip(round(pt[1]), 0, H - 1))
+
+            def seg_dir(s):
+                d = s[1] - s[0]; n = np.hypot(*d)
+                return d / n if n > 1e-6 else d
+            da = seg_dir(left_seg); db = seg_dir(right_seg)
+            if np.dot(da, db) < 0: db = -db
+            road_dir = (da + db) * 0.5
+            n = np.hypot(*road_dir)
+            if n > 1e-6: road_dir /= n
+
+            for seg in lines:
+                cv2.line(debug, tuple(np.round(seg[0]).astype(int)),
+                         tuple(np.round(seg[1]).astype(int)), (80, 80, 80), 2, cv2.LINE_AA)
+
+        # ── Gravity / latitude au point ───────────────────────────────────────
         gf = gravity_field
-        if isinstance(gf, torch.Tensor):
-            gvec = gf[:, py, px].cpu().float()
-        else:
-            gvec = torch.tensor(gf[:, py, px], dtype=torch.float32)
+        gvec = gf[:, py, px].cpu().float() if isinstance(gf, torch.Tensor) \
+               else torch.tensor(gf[:, py, px], dtype=torch.float32)
 
         lf = latitude_field
         lati_deg = float(lf[py, px].cpu()) if isinstance(lf, torch.Tensor) else float(lf[py, px])
@@ -169,35 +247,17 @@ class RoadGravitySampler:
         sin_l = float(np.sin(lati_rad))
         ux, uy = float(gvec[0]), float(gvec[1])
         up3d = torch.tensor([ux * cos_l, uy * cos_l, sin_l], dtype=torch.float32)
-
-        def seg_dir(s):
-            d = s[1] - s[0]; n = np.hypot(*d)
-            return d / n if n > 1e-6 else d
-
-        da = seg_dir(left_seg)
-        db = seg_dir(right_seg)
-        if np.dot(da, db) < 0:
-            db = -db
-        road_dir = (da + db) * 0.5
-        n = np.hypot(*road_dir)
-        if n > 1e-6:
-            road_dir /= n
         rvec = torch.tensor(road_dir, dtype=torch.float32)
 
-        for seg in lines:
-            p0 = tuple(np.round(seg[0]).astype(int))
-            p1 = tuple(np.round(seg[1]).astype(int))
-            cv2.line(debug, p0, p1, (80, 80, 80), 2, cv2.LINE_AA)
-
+        # ── Dessin des flèches ────────────────────────────────────────────────
         def draw_arrow(img, origin, vec, color, scale):
             ox, oy = int(origin[0]), int(origin[1])
-            ex = int(ox + vec[0] * scale)
-            ey = int(oy + vec[1] * scale)
-            cv2.arrowedLine(img, (ox, oy), (ex, ey), color, 3,
-                            cv2.LINE_AA, tipLength=0.25)
+            cv2.arrowedLine(img, (ox, oy),
+                            (int(ox + vec[0] * scale), int(oy + vec[1] * scale)),
+                            color, 3, cv2.LINE_AA, tipLength=0.25)
 
         draw_arrow(debug, pt, gvec.numpy(), (0, 220, 70),  arrow_scale * abs(cos_l))
-        draw_arrow(debug, pt, rvec.numpy(), (255, 140, 0), arrow_scale)
+        draw_arrow(debug, pt, rvec,         (255, 140, 0), arrow_scale)
 
         depth_r = max(3, int(abs(sin_l) * arrow_scale * 0.4))
         cv2.circle(debug, (px, py), depth_r, (0, 180, 255), 2, cv2.LINE_AA)
@@ -209,7 +269,8 @@ class RoadGravitySampler:
         cv2.putText(debug, "depth (sin lat)",             (12, 80),  font, 0.65, (0, 180, 255), 2, cv2.LINE_AA)
         cv2.putText(debug, f"up3D=({up3d[0]:.2f},{up3d[1]:.2f},{up3d[2]:.2f})",
                     (12, 106), font, 0.5, (160, 160, 160), 1, cv2.LINE_AA)
-        cv2.putText(debug, f"pt=({px},{py})",
+        mode_str = f"polyline pos={road_position:.2f}" if has_polyline else f"legacy pos={road_position:.2f}"
+        cv2.putText(debug, f"pt=({px},{py}) {mode_str}",
                     (12, 126), font, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
 
         out_rgb = cv2.cvtColor(debug, cv2.COLOR_BGR2RGB)

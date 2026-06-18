@@ -332,7 +332,7 @@
         "Node name for S&R": "BlenderPerspectiveRender"
       },
       "widgets_values": [
-        "/Users/aurele/Downloads/t-14_armata.glb",
+        "C:\\Users\\aurel\\Downloads\\t-14_armata.glb",
         15,
         45,
         0,
@@ -341,7 +341,7 @@
         128,
         true,
         false,
-        "/Applications/Blender.app/Contents/MacOS/Blender"
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe"
       ]
     },
     {
@@ -1152,7 +1152,7 @@
         "Node name for S&R": "BlenderPerspectiveRender"
       },
       "widgets_values": [
-        "/Users/aurele/Downloads/t-14_armata.glb",
+        "C:\\Users\\aurel\\Downloads\\t-14_armata.glb",
         15,
         45,
         0,
@@ -1161,7 +1161,7 @@
         128,
         true,
         false,
-        "/Applications/Blender.app/Contents/MacOS/Blender"
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe"
       ]
     },
     {
