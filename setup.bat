@@ -53,9 +53,9 @@ echo   pip install git+https://github.com/lpiccinelli-eth/UniDepth.git --no-deps
 
 REM ── 6. Workflow ────────────────────────────────────────────
 echo.
-echo [6/6] Copie du workflow...
+echo [6/6] Copie des workflows...
 if not exist "%COMFY_DIR%\user\default\workflows" mkdir "%COMFY_DIR%\user\default\workflows"
-copy "%REPO_DIR%ULTIMATE_PIPE.json" "%COMFY_DIR%\user\default\workflows\" >nul
+copy "%REPO_DIR%workflows\*.json" "%COMFY_DIR%\user\default\workflows\" >nul
 
 echo.
 echo ==========================================
@@ -64,7 +64,7 @@ echo ==========================================
 echo.
 echo PROCHAINES ETAPES :
 echo   1. Installer Blender : https://www.blender.org/download/
-echo   2. Ouvrir ComfyUI et charger ULTIMATE_PIPE.json
+echo   2. Ouvrir ComfyUI et charger workflows\ULTIMATE_PIPE_v2.json
 echo   3. Dans BlenderPerspectiveRender, mettre :
 echo      blender_path = C:\Program Files\Blender Foundation\Blender 4.x\blender.exe
 echo      model_3d_path = chemin vers t-14_armata.glb

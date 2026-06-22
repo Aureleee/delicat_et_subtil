@@ -78,9 +78,9 @@ cd "$REPO_DIR"
 
 # ── 6. Copier le workflow ────────────────────────────────────
 echo ""
-echo "[6/6] Copie du workflow..."
+echo "[6/6] Copie des workflows..."
 mkdir -p "$COMFY_DIR/user/default/workflows"
-cp "$REPO_DIR/ULTIMATE_PIPE.json" "$COMFY_DIR/user/default/workflows/" 2>/dev/null || true
+cp "$REPO_DIR/workflows/"*.json "$COMFY_DIR/user/default/workflows/" 2>/dev/null || true
 
 # ── Résumé ───────────────────────────────────────────────────
 echo ""
@@ -96,7 +96,7 @@ echo "  3. Mettre le chemin de Blender dans blender_path"
 echo "     (Windows: C:\Program Files\Blender Foundation\Blender 4.x\blender.exe)"
 echo "  4. Lancer ComfyUI :"
 echo "     cd ComfyUI && python main.py --listen"
-echo "  5. Charger ULTIMATE_PIPE.json dans ComfyUI"
+echo "  5. Charger workflows/ULTIMATE_PIPE_v2.json dans ComfyUI"
 echo ""
 echo "Les modèles (DepthAnything, SAM3.1) seront téléchargés"
 echo "automatiquement au premier lancement."

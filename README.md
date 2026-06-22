@@ -22,8 +22,8 @@ Le script installe automatiquement ComfyUI dans `delicat_et_subtil/ComfyUI/`.
 | Node | Rôle |
 |---|---|
 | `ComfyUI-PerspectiveFields` | Estimation gravité/latitude caméra |
-| `comfyui_road_insertion` | Détection bords route, bbox tank, composite |
-| `comfyui_blender_render` | Rendu Blender depuis ComfyUI |
+| `comfyui_road_insertion` | Détection routes (SAM3 All Roads), segmentation en quads (TEST), bbox tank, composite |
+| `comfyui_blender_render` | Rendu Blender depuis ComfyUI (orientation tank alignée sur la route) |
 | `comfyui-depthanythingv2` | Depth map |
 | `comfyui_unidepth` | UniDepth — depth métrique en mètres |
 | `comfyui_essentials` | Utilitaires (PreviewAny, MaskPreview+) |
@@ -35,7 +35,15 @@ Le script installe automatiquement ComfyUI dans `delicat_et_subtil/ComfyUI/`.
 1. **Blender** : installer depuis https://www.blender.org/download/
 2. **Modèle T-14** : télécharger le `.glb` et mettre le chemin dans `BlenderPerspectiveRender`
 3. **Lancer ComfyUI** : `cd ComfyUI && python main.py --listen`
-4. **Charger le workflow** : `ULTIMATE_PIPE.json` (copié automatiquement dans ComfyUI)
+4. **Charger le workflow** : `workflows/ULTIMATE_PIPE_v2.json` (copié automatiquement dans ComfyUI)
+
+## Workflows
+
+Les workflows sont dans le dossier [`workflows/`](workflows/) :
+
+- **`ULTIMATE_PIPE_v2.json`** — pipeline courant : SAM3 All Roads → TEST (RoadQuadSegments)
+  → Road Quad Gravity Sampler → Blender Perspective Render. Le tank est orienté
+  automatiquement dans l'axe de la route (direction parallèle aux bords).
 
 ## Modèles téléchargés automatiquement au premier run
 

@@ -20,6 +20,9 @@ import torch
 import cv2
 from .unidepth_inference import UNIDEPTH_DEPTH, UNIDEPTH_POINTS, UNIDEPTH_INTRINSICS
 
+# Type token partagé avec road_quad_segments
+ROAD_QUAD_PAIRS = "ROAD_QUAD_PAIRS"
+
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -203,39 +206,40 @@ class UniDepthPointViz:
 
 class UniDepthRoadWidth:
     """
-    Estime la largeur réelle de la route en mètres en utilisant :
-    - Les bords de route (LINE_SEGMENTS de RoadMaskBorderFit)
-    - La metric depth (UNIDEPTH_DEPTH) pour convertir pixels → mètres
-    - Les intrinsics caméra (UNIDEPTH_INTRINSICS) pour la conversion angulaire
+    Estime la largeur réelle de chaque segment de route en mètres.
 
-    Principe :
-      À chaque niveau Y (plusieurs hauteurs dans l'image), on intersecte les
-      deux droites de bord avec la ligne horizontale, on calcule l'angle angulaire
-      entre les deux points, et on utilise la depth pour convertir en distance réelle :
-        largeur_m = depth × tan(angle/2) × 2  ≈  depth × (Δx_px / fx)
+    Prend les quad_pairs du node TEST (RoadQuadSegments) — chaque quad est
+    un quadrilatère [left_top, right_top, right_bot, left_bot].
+
+    À chaque division le long du segment :
+      1. left_pt  = lerp(quad[0], quad[3], t)
+      2. right_pt = lerp(quad[1], quad[2], t)
+      3. road_dir = direction principale du quad (moy. des deux côtés)
+      4. normal   = ⊥ road_dir  (perpendiculaire vraie à la route)
+      5. width_px = |dot(right_pt − left_pt, normal)|
+      6. depth au milieu → width_m = depth × width_px / fx
 
     Outputs :
-      viz_image   : image avec bords tracés + largeurs annotées
-      widths_str  : STRING avec tableau des largeurs par niveau Y
+      viz_image      : image annotée avec les mesures par segment
+      widths_summary : STRING récapitulatif
     """
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image":        ("IMAGE",),
-                "border_lines": ("LINE_SEGMENTS",),
+                "image":      ("IMAGE",),
+                "quad_pairs": (ROAD_QUAD_PAIRS,),
                 "metric_depth": (UNIDEPTH_DEPTH,),
                 "intrinsics":   (UNIDEPTH_INTRINSICS,),
             },
             "optional": {
-                "road_mask": ("IMAGE", {
-                    "tooltip": "Masque de route optionnel (pour filtrer les points hors route)."}),
-                "n_levels": ("INT", {
-                    "default": 6, "min": 2, "max": 20,
-                    "tooltip": "Nombre de niveaux Y où estimer la largeur."}),
-                "margin_frac": ("FLOAT", {
-                    "default": 0.1, "min": 0.0, "max": 0.4, "step": 0.01}),
+                "n_divisions": ("INT", {
+                    "default": 4, "min": 1, "max": 20,
+                    "tooltip": "Nombre de mesures de largeur par segment de quad."}),
+                "depth_radius": ("INT", {
+                    "default": 5, "min": 1, "max": 20,
+                    "tooltip": "Rayon du patch (px) pour la médiane de profondeur."}),
             }
         }
 
@@ -244,13 +248,13 @@ class UniDepthRoadWidth:
     FUNCTION      = "estimate"
     CATEGORY      = "depth/unidepth"
 
-    def estimate(self, image, border_lines, metric_depth, intrinsics,
-                 road_mask=None, n_levels=6, margin_frac=0.1):
+    def estimate(self, image, quad_pairs, metric_depth, intrinsics,
+                 n_divisions=4, depth_radius=5):
 
-        rgb   = _t2np_img(image)
-        H, W  = rgb.shape[:2]
+        rgb  = _t2np_img(image)
+        H, W = rgb.shape[:2]
 
-        # Depth
+        # Depth → (H, W)
         if metric_depth.dim() == 3:
             depth_np = metric_depth.squeeze(0).cpu().float().numpy()
         else:
@@ -258,126 +262,106 @@ class UniDepthRoadWidth:
         if depth_np.shape != (H, W):
             depth_np = cv2.resize(depth_np, (W, H), interpolation=cv2.INTER_LINEAR)
 
-        # Intrinsics
-        K = intrinsics.cpu().float().numpy()
+        # Intrinsics → fx
+        K  = intrinsics.cpu().float().numpy()
         fx = float(K[0, 0])
 
-        # Segments de bord
-        lines   = border_lines.get("lines", np.zeros((0, 2, 2)))
-        bW, bH  = border_lines.get("width", W), border_lines.get("height", H)
-
         vis = rgb.copy()
-
-        if lines.shape[0] < 2:
-            cv2.putText(vis, "Besoin de 2 segments de bord (gauche + droite)",
-                        (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 80, 255), 2)
-            return (_np2t(vis), "Pas assez de segments")
-
-        seg_l, seg_r = lines[0], lines[1]
-
-        # ── Normale perpendiculaire à la route ────────────────────────────────
-        # Direction moyenne des deux bords → normale = rotation 90°
-        def seg_dir_norm(seg):
-            d = seg[1] - seg[0]
-            n = np.linalg.norm(d)
-            return d / n if n > 1e-6 else d
-
-        dir_l = seg_dir_norm(seg_l)
-        dir_r = seg_dir_norm(seg_r)
-        if np.dot(dir_l, dir_r) < 0:
-            dir_r = -dir_r
-        road_dir = (dir_l + dir_r) / 2.0
-        road_dir /= np.linalg.norm(road_dir) + 1e-9
-        # Normale à la route (perpendiculaire, pointant vers la droite)
-        road_perp = np.array([road_dir[1], -road_dir[0]])  # rotation -90°
-        if road_perp[0] < 0:
-            road_perp = -road_perp  # toujours vers x positif
-
-        # Tracer les bords
-        def draw_seg(s, color, label):
-            p0 = tuple(np.round(s[0]).astype(int))
-            p1 = tuple(np.round(s[1]).astype(int))
-            cv2.line(vis, p0, p1, color, 3, cv2.LINE_AA)
-            mid = ((p0[0] + p1[0]) // 2, (p0[1] + p1[1]) // 2)
-            cv2.putText(vis, label, (mid[0] + 5, mid[1]),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA)
-
-        draw_seg(seg_l, (255, 140, 0), "gauche")
-        draw_seg(seg_r, (0, 160, 255), "droite")
-
-        # ── x(y) pour un segment linéaire ────────────────────────────────────
-        def seg_x_at_y(seg, y):
-            """Interpoler x sur le segment à hauteur y."""
-            x0, y0 = seg[0]
-            x1, y1 = seg[1]
-            if abs(y1 - y0) < 1e-3:
-                return (x0 + x1) / 2.0
-            t = (y - y0) / (y1 - y0)
-            return x0 + t * (x1 - x0)
-
-        # Y-range commun aux deux segments
-        yl0 = max(min(seg_l[0, 1], seg_l[1, 1]), min(seg_r[0, 1], seg_r[1, 1]))
-        yl1 = min(max(seg_l[0, 1], seg_l[1, 1]), max(seg_r[0, 1], seg_r[1, 1]))
-        my  = int(margin_frac * (yl1 - yl0))
-        yl0 = int(yl0) + my
-        yl1 = int(yl1) - my
-        if yl1 <= yl0:
-            yl0, yl1 = int(yl0), int(yl1) + 20
-
-        ys = np.linspace(yl0, yl1, n_levels).astype(int)
-
         lines_out = []
-        for y in ys:
-            y = int(np.clip(y, 0, H - 1))
-            xl = float(seg_x_at_y(seg_l, y))
-            xr = float(seg_x_at_y(seg_r, y))
-            if xl > xr:
-                xl, xr = xr, xl
 
-            xli, xri = int(np.clip(xl, 0, W - 1)), int(np.clip(xr, 0, W - 1))
+        if not quad_pairs:
+            cv2.putText(vis, "Aucun quad_pairs reçu — connecter la sortie TEST",
+                        (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 80, 255), 2)
+            return (_np2t(vis), "Aucun quad")
 
-            # Depth au centre de la route à ce niveau
-            xc = (xli + xri) // 2
-            d, std = _get_depth_at(depth_np, xc, y, radius=5)
+        # Dessiner les bords de tous les quads (léger, pour contexte)
+        for entry in quad_pairs:
+            quad  = entry["quad"].astype(np.float32)
+            color = entry.get("color", (200, 200, 200))
+            bright = tuple(min(255, int(c * 1.3)) for c in color)
+            # Côté gauche : quad[0]→quad[3],  côté droit : quad[1]→quad[2]
+            for p0, p1 in [(quad[0], quad[3]), (quad[1], quad[2])]:
+                cv2.line(vis,
+                         (int(p0[0]), int(p0[1])),
+                         (int(p1[0]), int(p1[1])),
+                         bright, 1, cv2.LINE_AA)
 
-            if d < 0.1 or fx < 1.0:
-                lines_out.append(f"y={y:4d}  xl={xl:.0f} xr={xr:.0f}  depth=N/A")
+        # Mesures perpendiculaires
+        ts = np.linspace(0.0, 1.0, n_divisions + 2)[1:-1]  # évite les extrémités
+
+        for entry in quad_pairs:
+            quad     = entry["quad"].astype(np.float64)
+            road_idx = entry["road_idx"]
+            seg_idx  = entry["seg_idx"]
+            color    = entry.get("color", (200, 200, 200))
+            meas_color = (0, 230, 230)   # cyan pour les mesures
+
+            # Direction de route = moyenne des deux côtés
+            left_dir  = quad[3] - quad[0]   # vecteur côté gauche
+            right_dir = quad[2] - quad[1]   # vecteur côté droit
+            road_dir  = (left_dir + right_dir) / 2.0
+            norm      = np.linalg.norm(road_dir)
+            if norm < 1e-6:
                 continue
+            road_dir /= norm
+            # Normale perpendiculaire (vers la droite de la route)
+            normal = np.array([-road_dir[1], road_dir[0]])
 
-            # Vecteur pixel entre les deux bords (horizontal à ce niveau y)
-            delta_px = np.array([xr - xl, 0.0])
-            # Projection sur la normale à la route = vraie largeur perpendiculaire
-            perp_px = abs(float(np.dot(delta_px, road_perp)))
+            for t in ts:
+                left_pt  = quad[0] + t * (quad[3] - quad[0])
+                right_pt = quad[1] + t * (quad[2] - quad[1])
+                mid_pt   = (left_pt + right_pt) / 2.0
 
-            width_m = d * perp_px / fx
-            width_std = std * perp_px / fx
+                # Largeur pixel perpendiculaire vraie
+                width_px = abs(float(np.dot(right_pt - left_pt, normal)))
 
-            # Dessiner la ligne de mesure perpendiculaire (pas horizontale)
-            # Point gauche et droite sur la perpendiculaire passant par le centre
-            half = road_perp * perp_px / 2.0
-            pl = (int(xc - half[0]), int(y - half[1]))
-            pr = (int(xc + half[0]), int(y + half[1]))
-            cv2.line(vis, pl, pr, (0, 255, 255), 1, cv2.LINE_AA)
-            cv2.circle(vis, (xli, y), 4, (255, 140, 0), -1, cv2.LINE_AA)
-            cv2.circle(vis, (xri, y), 4, (0, 160, 255), -1, cv2.LINE_AA)
+                xi, yi = int(np.clip(mid_pt[0], 0, W - 1)), int(np.clip(mid_pt[1], 0, H - 1))
+                d, std = _get_depth_at(depth_np, xi, yi, radius=depth_radius)
 
-            label = f"{width_m:.2f}m"
-            if std > 0.05:
-                label += f" ±{width_std:.2f}"
-            cv2.putText(vis, label, (xc - 20, y - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1, cv2.LINE_AA)
+                # Projeter left_pt et right_pt sur la normale pour
+                # trouver les extrémités exactes du segment de mesure
+                proj_l = float(np.dot(left_pt,  normal))
+                proj_r = float(np.dot(right_pt, normal))
+                t_center = float(np.dot(mid_pt, road_dir))
+                meas_l = mid_pt + (proj_l - float(np.dot(mid_pt, normal))) * normal
+                meas_r = mid_pt + (proj_r - float(np.dot(mid_pt, normal))) * normal
 
-            lines_out.append(
-                f"y={y:4d}  xl={xl:6.1f} xr={xr:6.1f}  "
-                f"perp={perp_px:5.1f}px  depth={d:.2f}m  largeur⊥={width_m:.2f}m ±{width_std:.2f}"
-            )
+                pl = (int(np.clip(meas_l[0], 0, W-1)), int(np.clip(meas_l[1], 0, H-1)))
+                pr = (int(np.clip(meas_r[0], 0, W-1)), int(np.clip(meas_r[1], 0, H-1)))
 
-        # Légende
-        cv2.putText(vis, "cyan=mesure  orange=gauche  bleu=droite",
+                cv2.line(vis, pl, pr, meas_color, 1, cv2.LINE_AA)
+                cv2.circle(vis, pl, 3, (255, 140,  0), -1)
+                cv2.circle(vis, pr, 3, (  0, 140, 255), -1)
+
+                if d > 0.1 and fx > 1.0:
+                    width_m   = d * width_px / fx
+                    width_std = std * width_px / fx
+                    label = f"{width_m:.2f}m"
+                    if std > 0.05:
+                        label += f"±{width_std:.2f}"
+                    lx = int(mid_pt[0]) - 22
+                    ly = int(mid_pt[1]) - 4
+                    (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
+                    cv2.rectangle(vis, (lx - 1, ly - th - 1), (lx + tw + 1, ly + 1),
+                                  (0, 0, 0), -1)
+                    cv2.putText(vis, label, (lx, ly),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.38, meas_color, 1, cv2.LINE_AA)
+                    lines_out.append(
+                        f"R{road_idx+1}-S{seg_idx+1} t={t:.2f}  "
+                        f"width_px={width_px:.1f}  depth={d:.2f}m  "
+                        f"largeur={width_m:.3f}m ±{width_std:.3f}"
+                    )
+                else:
+                    lines_out.append(
+                        f"R{road_idx+1}-S{seg_idx+1} t={t:.2f}  "
+                        f"width_px={width_px:.1f}  depth=N/A"
+                    )
+
+        cv2.putText(vis, "cyan=mesure perp  orange=bord gauche  bleu=bord droit",
                     (8, H - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.38,
                     (180, 180, 180), 1, cv2.LINE_AA)
 
-        summary = "UniDepth Road Width Estimator\n" + "\n".join(lines_out)
+        summary = "UniDepth Road Width (perpendicular)\n" + "\n".join(lines_out)
         return (_np2t(vis), summary)
 
 
