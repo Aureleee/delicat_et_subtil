@@ -348,12 +348,12 @@ class BlenderPerspectiveRender:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "model_3d_path":   ("STRING", {"default": "/Users/aurele/Downloads/t-14_armata.glb"}),
+            "model_3d_path":   ("STRING", {"default": "C:\\Users\\aurel\\Downloads\\t-14_armata.glb"}),
             "up_vector_3d":    ("GRAVITY_FIELD",),
             "road_vector_2d":  ("GRAVITY_FIELD",),
             "latitude_deg":    ("FLOAT", {"forceInput": True,
                                 "tooltip": "Depuis RoadGravitySampler. el = -latitude."}),
-            "camera_distance": ("FLOAT", {"default":12.0,"min":0.5,"max":200.,"step":0.5}),
+            "camera_distance": ("FLOAT", {"default":25.4,"min":0.5,"max":200.,"step":0.5}),
             "camera_azimuth":  ("FLOAT", {"default":45.0,"min":-360.,"max":360.,"step":1.0,
                                 "tooltip": "À caler sur la direction réelle de la scène."}),
             "road_direction_offset_deg": ("FLOAT", {
@@ -364,11 +364,11 @@ class BlenderPerspectiveRender:
                                 "tooltip": "Rotation du modèle sur lui-même autour de la normale. "
                                            "90 = compense l'orientation de base du tank (pointe +X) "
                                            "pour l'aligner sur l'axe de la route. 180=sens inverse."}),
-            "resolution":      ("INT",   {"default":1024,"min":128,"max":4096,"step":64}),
+            "resolution":      ("INT",   {"default":256,"min":128,"max":4096,"step":64}),
             "samples":         ("INT",   {"default":128,"min":1,"max":1024,"step":1}),
             "transparent_background":("BOOLEAN",{"default":True}),
             "plain_material":  ("BOOLEAN",{"default":False}),
-            "blender_path":    ("STRING",{"default":"/Applications/Blender.app/Contents/MacOS/Blender"}),
+            "blender_path":    ("STRING",{"default":"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe"}),
         }}
     RETURN_TYPES=("IMAGE",); RETURN_NAMES=("image",); FUNCTION="render"; CATEGORY="Blender"
 

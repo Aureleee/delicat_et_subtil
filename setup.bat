@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM setup.bat — Installation complète ComfyUI + Tank Pipeline
+REM setup.bat — Installation complete ComfyUI + Vehicle Pipeline
 REM Usage : double-clic ou "setup.bat" dans cmd
 REM ============================================================
 
@@ -8,7 +8,7 @@ set REPO_DIR=%~dp0
 set COMFY_DIR=%REPO_DIR%ComfyUI
 
 echo ==========================================
-echo  Tank Pipeline — Setup Windows
+echo  Vehicle Insertion Pipeline — Setup Windows
 echo ==========================================
 echo.
 
@@ -38,7 +38,7 @@ REM ── 4. Dependances des custom nodes ────────────�
 echo.
 echo [4/6] Installation des dependances...
 pip install opencv-python numpy torch torchvision torchaudio ^
-            scipy matplotlib Pillow huggingface_hub timm einops ^
+            scipy scikit-image matplotlib Pillow huggingface_hub timm einops ^
             transformers wandb
 
 for /R "%COMFY_DIR%\custom_nodes" %%f in (requirements.txt) do (
@@ -51,7 +51,7 @@ echo [5/6] UniDepth...
 echo   Installer manuellement si besoin :
 echo   pip install git+https://github.com/lpiccinelli-eth/UniDepth.git --no-deps
 
-REM ── 6. Workflow ────────────────────────────────────────────
+REM ── 6. Workflows ───────────────────────────────────────────
 echo.
 echo [6/6] Copie des workflows...
 if not exist "%COMFY_DIR%\user\default\workflows" mkdir "%COMFY_DIR%\user\default\workflows"
@@ -64,10 +64,10 @@ echo ==========================================
 echo.
 echo PROCHAINES ETAPES :
 echo   1. Installer Blender : https://www.blender.org/download/
-echo   2. Ouvrir ComfyUI et charger workflows\ULTIMATE_PIPE_v2.json
-echo   3. Dans BlenderPerspectiveRender, mettre :
-echo      blender_path = C:\Program Files\Blender Foundation\Blender 4.x\blender.exe
-echo      model_3d_path = chemin vers t-14_armata.glb
-echo   4. Lancer : cd ComfyUI ^&^& python main.py --listen
+echo   2. Lancer ComfyUI : cd ComfyUI ^&^& python main.py --listen
+echo   3. Charger le workflow : pipeline_main.json
+echo   4. Dans BlenderPerspectiveRender, verifier :
+echo      blender_path = C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+echo      model_3d_path = chemin vers votre modele .glb
 echo.
 pause

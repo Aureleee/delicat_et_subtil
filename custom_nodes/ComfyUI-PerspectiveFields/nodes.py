@@ -337,9 +337,9 @@ class RoadQuadGravitySampler:
                 "quad_pairs":     (ROAD_QUAD_PAIRS,),
                 "gravity_field":  ("GRAVITY_FIELD",),
                 "latitude_field": ("LATITUDE_FIELD",),
-                "selection_mode": (["slider", "point_xy"], {"default": "slider"}),
+                "selection_mode": (["slider", "point_xy"], {"default": "point_xy"}),
                 "p": ("FLOAT", {
-                    "default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01,
+                    "default": 0.72, "min": 0.0, "max": 1.0, "step": 0.01,
                     "display": "slider",
                     "tooltip": "Mode slider : position le long de la centerline de "
                                "la route (0 = fond/haut, 1 = près de la caméra/bas). "
@@ -350,13 +350,13 @@ class RoadQuadGravitySampler:
                 "arrow_scale": ("FLOAT", {
                     "default": 80.0, "min": 10.0, "max": 300.0, "step": 5.0}),
                 "invert_direction": ("BOOLEAN", {
-                    "default": False,
+                    "default": True,
                     "tooltip": "Retourne le road_vector de 180° → change le sens du "
                                "tank (avant/arrière)."}),
             },
             "optional": {
                 "road_index": ("INT", {
-                    "default": -1, "min": -1, "max": 64,
+                    "default": 0, "min": -1, "max": 64,
                     "tooltip": "-1 = route principale (celle avec le plus de quads). "
                                ">=0 = sélectionne une route précise (road_idx)."}),
                 "background_image": ("IMAGE",),
@@ -364,9 +364,10 @@ class RoadQuadGravitySampler:
         }
 
     RETURN_TYPES  = ("GRAVITY_FIELD", "GRAVITY_FIELD", "GRAVITY_FIELD", "FLOAT",
-                     "INT", "INT", "IMAGE")
+                     "INT", "INT", "IMAGE", ROAD_QUAD_PAIRS)
     RETURN_NAMES  = ("up_vector_3d", "gravity_vector_2d", "road_vector_2d",
-                     "latitude_deg", "point_x", "point_y", "debug_image")
+                     "latitude_deg", "point_x", "point_y", "debug_image",
+                     "active_quad")
     FUNCTION = "sample"
     CATEGORY = "PerspectiveFields"
 
@@ -626,7 +627,11 @@ class RoadQuadGravitySampler:
 
         out_rgb = cv2.cvtColor(debug, cv2.COLOR_BGR2RGB)
         out_t = torch.from_numpy(out_rgb.astype(np.float32) / 255.0).unsqueeze(0)
-        return (up3d, gvec, rvec, lati_deg, px, py, out_t)
+
+        # Active quad : le seul quad sélectionné, emballé dans une liste
+        active_quad = [quad_pairs[sel_idx]] if quad_pairs and sel_idx < len(quad_pairs) else []
+
+        return (up3d, gvec, rvec, lati_deg, px, py, out_t, active_quad)
 
 
 # ─── Registration ─────────────────────────────────────────────────────────────

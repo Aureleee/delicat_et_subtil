@@ -1,0 +1,1966 @@
+{
+  "id": "0803fad0-165d-4e20-9084-a990b4bf29d1",
+  "revision": 0,
+  "last_node_id": 33,
+  "last_link_id": 52,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "PerspectiveFieldsInference",
+      "pos": [
+        19150.963568346095,
+        -5950.370282022876
+      ],
+      "size": [
+        249.8248046875,
+        66
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        },
+        {
+          "name": "model",
+          "type": "PERSPECTIVE_MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vector_image",
+          "type": "IMAGE",
+          "links": [
+            23
+          ]
+        },
+        {
+          "name": "gravity_field",
+          "type": "GRAVITY_FIELD",
+          "links": [
+            30
+          ]
+        },
+        {
+          "name": "latitude_field",
+          "type": "LATITUDE_FIELD",
+          "links": [
+            31
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PerspectiveFieldsInference"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 2,
+      "type": "UniDepthLoader",
+      "pos": [
+        19141.195462363576,
+        -6371.821993976912
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "unidepth_model",
+          "type": "UNIDEPTH_MODEL",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UniDepthLoader"
+      },
+      "widgets_values": [
+        "unidepth-v2-vitl14",
+        5
+      ]
+    },
+    {
+      "id": 3,
+      "type": "UniDepthPointViz",
+      "pos": [
+        19603.462461373674,
+        -6538.8026710866025
+      ],
+      "size": [
+        270,
+        218
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "metric_depth",
+          "type": "UNIDEPTH_DEPTH",
+          "link": null
+        },
+        {
+          "name": "confidence_map",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "viz_image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UniDepthPointViz"
+      },
+      "widgets_values": [
+        6,
+        4,
+        0.1,
+        true,
+        3,
+        0.45
+      ]
+    },
+    {
+      "id": 4,
+      "type": "UniDepthRoadWidth",
+      "pos": [
+        19946.337452531763,
+        -6618.762377544334
+      ],
+      "size": [
+        274.734375,
+        142
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "name": "quad_pairs",
+          "type": "ROAD_QUAD_PAIRS",
+          "link": 4
+        },
+        {
+          "name": "metric_depth",
+          "type": "UNIDEPTH_DEPTH",
+          "link": 5
+        },
+        {
+          "name": "intrinsics",
+          "type": "UNIDEPTH_INTRINSICS",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "viz_image",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "widths_summary",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UniDepthRoadWidth"
+      },
+      "widgets_values": [
+        2,
+        5
+      ]
+    },
+    {
+      "id": 5,
+      "type": "UniDepthInference",
+      "pos": [
+        19577.885185862513,
+        -6244.4817889763535
+      ],
+      "size": [
+        289.88671875,
+        182
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "name": "unidepth_model",
+          "type": "UNIDEPTH_MODEL",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "depth_map",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        },
+        {
+          "name": "confidence_map",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "metric_depth",
+          "type": "UNIDEPTH_DEPTH",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "point_cloud",
+          "type": "UNIDEPTH_POINTS",
+          "links": null
+        },
+        {
+          "name": "intrinsics",
+          "type": "UNIDEPTH_INTRINSICS",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UniDepthInference"
+      },
+      "widgets_values": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": 6,
+      "type": "PreviewImage",
+      "pos": [
+        20356.856639640748,
+        -7136.059034119556
+      ],
+      "size": [
+        799.0633539429582,
+        395.25356156780254
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 9
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 7,
+      "type": "AnyPassthrough",
+      "pos": [
+        19190.4828713049,
+        -5789.528593428351
+      ],
+      "size": [
+        162.659765625,
+        26
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "value",
+          "type": "*",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "value",
+          "type": "*",
+          "links": [
+            4,
+            29,
+            37
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AnyPassthrough"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 8,
+      "type": "PerspectiveFieldsLoader",
+      "pos": [
+        18660.60392226262,
+        -6091.335058895973
+      ],
+      "size": [
+        293.5416015625,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "PERSPECTIVE_MODEL",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PerspectiveFieldsLoader"
+      },
+      "widgets_values": [
+        "Paramnet-360Cities-edina-centered"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [
+        19896.207090140117,
+        -6421.5151681292255
+      ],
+      "size": [
+        538.2679559386743,
+        339.1085746618264
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "BlenderPerspectiveRender",
+      "pos": [
+        21220.4441255524,
+        -5351.394531021141
+      ],
+      "size": [
+        309.974609375,
+        314
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "up_vector_3d",
+          "type": "GRAVITY_FIELD",
+          "link": 12
+        },
+        {
+          "name": "road_vector_2d",
+          "type": "GRAVITY_FIELD",
+          "link": 13
+        },
+        {
+          "name": "latitude_deg",
+          "type": "FLOAT",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            16,
+            44,
+            51
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BlenderPerspectiveRender"
+      },
+      "widgets_values": [
+        "C:\\Users\\aurel\\Downloads\\t-14_armata.glb",
+        25.4,
+        45,
+        0,
+        90,
+        256,
+        128,
+        true,
+        false,
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "PreviewImage",
+      "pos": [
+        22721.650260401846,
+        -6131.629700941602
+      ],
+      "size": [
+        559.8886002804848,
+        408.19994685941674
+      ],
+      "flags": {},
+      "order": 29,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "AlphaBBox",
+      "pos": [
+        22158.801593443357,
+        -6001.208346612607
+      ],
+      "size": [
+        270,
+        274
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "x",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "y",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "cx",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "cy",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AlphaBBox"
+      },
+      "widgets_values": [
+        10,
+        0,
+        255,
+        80,
+        2
+      ]
+    },
+    {
+      "id": 13,
+      "type": "AnyPassthrough",
+      "pos": [
+        19202.45669262961,
+        -5606.711900846837
+      ],
+      "size": [
+        162.659765625,
+        26
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "value",
+          "type": "*",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "value",
+          "type": "*",
+          "links": [
+            39,
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AnyPassthrough"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 14,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        17459.350716709872,
+        -5985.525789201214
+      ],
+      "size": [
+        271.8306640625,
+        98
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            19
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            18
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "sam3.1_multiplex_fp16.safetensors"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "CLIPTextEncode",
+      "pos": [
+        17642.97851248058,
+        -5828.031851529701
+      ],
+      "size": [
+        218.659765625,
+        145.66770457372013
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "road"
+      ]
+    },
+    {
+      "id": 16,
+      "type": "LoadImage",
+      "pos": [
+        17928.01791377025,
+        -6474.189658776456
+      ],
+      "size": [
+        353.85546875,
+        314
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1,
+            3,
+            7,
+            17,
+            20,
+            26,
+            28,
+            32
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "bkg_3_00001_.png",
+        "image"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "SAM3AllRoads",
+      "pos": [
+        18237.73687049983,
+        -6127.832807969011
+      ],
+      "size": [
+        271.236328125,
+        166
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 19
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 20
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "colored_viz",
+          "type": "IMAGE",
+          "links": [
+            22
+          ]
+        },
+        {
+          "name": "merged_mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "individual_masks",
+          "type": "MASK",
+          "links": [
+            25,
+            27,
+            38
+          ]
+        },
+        {
+          "name": "n_roads",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SAM3AllRoads"
+      },
+      "widgets_values": [
+        0.5,
+        10,
+        4
+      ]
+    },
+    {
+      "id": 21,
+      "type": "RoadQuadSegments",
+      "pos": [
+        18957.219353171433,
+        -5358.6146099610205
+      ],
+      "size": [
+        335.685546875,
+        406
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "individual_masks",
+          "type": "MASK",
+          "link": 25
+        },
+        {
+          "name": "background_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "masked_debug",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "n_total_quads",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "quad_pairs",
+          "type": "ROAD_QUAD_PAIRS",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RoadQuadSegments"
+      },
+      "widgets_values": [
+        0.05,
+        25,
+        2,
+        300,
+        10,
+        3,
+        0.35,
+        2000,
+        0.2,
+        30,
+        100,
+        25,
+        2
+      ]
+    },
+    {
+      "id": 22,
+      "type": "RoadQuadSegments",
+      "pos": [
+        18377.833816402555,
+        -5573.42268891354
+      ],
+      "size": [
+        335.685546875,
+        406
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "individual_masks",
+          "type": "MASK",
+          "link": 27
+        },
+        {
+          "name": "background_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 28
+        }
+      ],
+      "outputs": [
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "masked_debug",
+          "type": "IMAGE",
+          "links": [
+            24
+          ]
+        },
+        {
+          "name": "n_total_quads",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "quad_pairs",
+          "type": "ROAD_QUAD_PAIRS",
+          "links": [
+            10,
+            47
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RoadQuadSegments"
+      },
+      "widgets_values": [
+        0.03,
+        50,
+        1,
+        300,
+        10,
+        3,
+        0.35,
+        200,
+        0.05,
+        10,
+        2000,
+        25,
+        2
+      ]
+    },
+    {
+      "id": 23,
+      "type": "RoadQuadGravitySampler",
+      "pos": [
+        20358.488861939768,
+        -5388.76356748782
+      ],
+      "size": [
+        376.91953125,
+        342
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "quad_pairs",
+          "type": "ROAD_QUAD_PAIRS",
+          "link": 29
+        },
+        {
+          "name": "gravity_field",
+          "type": "GRAVITY_FIELD",
+          "link": 30
+        },
+        {
+          "name": "latitude_field",
+          "type": "LATITUDE_FIELD",
+          "link": 31
+        },
+        {
+          "name": "background_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "name": "point_x",
+          "type": "INT",
+          "widget": {
+            "name": "point_x"
+          },
+          "link": 33
+        },
+        {
+          "name": "point_y",
+          "type": "INT",
+          "widget": {
+            "name": "point_y"
+          },
+          "link": 34
+        },
+        {
+          "name": "road_index",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "road_index"
+          },
+          "link": 35
+        }
+      ],
+      "outputs": [
+        {
+          "name": "up_vector_3d",
+          "type": "GRAVITY_FIELD",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "gravity_vector_2d",
+          "type": "GRAVITY_FIELD",
+          "links": null
+        },
+        {
+          "name": "road_vector_2d",
+          "type": "GRAVITY_FIELD",
+          "links": [
+            13,
+            46
+          ]
+        },
+        {
+          "name": "latitude_deg",
+          "type": "FLOAT",
+          "links": [
+            14
+          ]
+        },
+        {
+          "name": "point_x",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "point_y",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": [
+            40
+          ]
+        },
+        {
+          "name": "active_quad",
+          "type": "ROAD_QUAD_PAIRS",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RoadQuadGravitySampler"
+      },
+      "widgets_values": [
+        "point_xy",
+        0.72,
+        0,
+        0,
+        80,
+        true,
+        0
+      ]
+    },
+    {
+      "id": 24,
+      "type": "PreviewImage",
+      "pos": [
+        23107.04907677974,
+        -4554.528312372766
+      ],
+      "size": [
+        254.00048487017193,
+        295.4165376166102
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 36
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 25,
+      "type": "RoadInsertionController",
+      "pos": [
+        20761.74740452772,
+        -5087.653717863819
+      ],
+      "size": [
+        302.876953125,
+        166
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "quad_pairs",
+          "type": "ROAD_QUAD_PAIRS",
+          "link": 37
+        },
+        {
+          "name": "individual_masks",
+          "type": "MASK",
+          "link": 38
+        },
+        {
+          "name": "background_image",
+          "type": "IMAGE",
+          "link": 39
+        }
+      ],
+      "outputs": [
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": [
+            50
+          ]
+        },
+        {
+          "name": "insertion_points",
+          "type": "INSERTION_POINTS",
+          "links": [
+            41
+          ]
+        },
+        {
+          "name": "n_found",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "road_index",
+          "type": "INT",
+          "links": [
+            35
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RoadInsertionController"
+      },
+      "widgets_values": [
+        3,
+        0,
+        0.05
+      ],
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 30,
+      "type": "PreviewImage",
+      "pos": [
+        22103.35267077759,
+        -6696.3881682690835
+      ],
+      "size": [
+        616.9857636454653,
+        361.92380751019573
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 50
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 31,
+      "type": "TankWidthSides",
+      "pos": [
+        21898.97113817891,
+        -5528.780853603725
+      ],
+      "size": [
+        270,
+        78
+      ],
+      "flags": {},
+      "order": 28,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 51
+        }
+      ],
+      "outputs": [
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": [
+            36
+          ]
+        },
+        {
+          "name": "tank_width_px",
+          "type": "FLOAT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TankWidthSides"
+      },
+      "widgets_values": [
+        1
+      ]
+    },
+    {
+      "id": 19,
+      "type": "PreviewImage",
+      "pos": [
+        19240.90245276257,
+        -5027.994127351549
+      ],
+      "size": [
+        764.3490060440381,
+        432.11591441794735
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 23
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 20,
+      "type": "PreviewImage",
+      "pos": [
+        18454.928872602406,
+        -5008.471815208415
+      ],
+      "size": [
+        701.7833263396678,
+        436.4126656008425
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 24
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 18,
+      "type": "PreviewImage",
+      "pos": [
+        17555.883165306437,
+        -5324.981901799511
+      ],
+      "size": [
+        700.5912571430581,
+        433.04176585379514
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 26,
+      "type": "PreviewImage",
+      "pos": [
+        20557.56720847558,
+        -4783.806615395446
+      ],
+      "size": [
+        711.112394347063,
+        632.488034387392
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 40
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 27,
+      "type": "InsertionPointSelector",
+      "pos": [
+        21172.061066265043,
+        -4923.411406301605
+      ],
+      "size": [
+        270,
+        98
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "insertion_points",
+          "type": "INSERTION_POINTS",
+          "link": 41
+        }
+      ],
+      "outputs": [
+        {
+          "name": "point_x",
+          "type": "INT",
+          "links": [
+            33,
+            48
+          ]
+        },
+        {
+          "name": "point_y",
+          "type": "INT",
+          "links": [
+            34,
+            49
+          ]
+        },
+        {
+          "name": "active_quad",
+          "type": "ROAD_QUAD_PAIRS",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "InsertionPointSelector"
+      },
+      "widgets_values": [
+        1
+      ],
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 29,
+      "type": "TankComposite",
+      "pos": [
+        21606.66647951907,
+        -5169.824610345233
+      ],
+      "size": [
+        270,
+        398
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "background",
+          "type": "IMAGE",
+          "link": 43
+        },
+        {
+          "name": "tank_rgba",
+          "type": "IMAGE",
+          "link": 44
+        },
+        {
+          "name": "active_quad",
+          "type": "ROAD_QUAD_PAIRS",
+          "link": 45
+        },
+        {
+          "name": "road_vector_2d",
+          "shape": 7,
+          "type": "GRAVITY_FIELD",
+          "link": 46
+        },
+        {
+          "name": "all_quad_pairs",
+          "shape": 7,
+          "type": "ROAD_QUAD_PAIRS",
+          "link": 47
+        },
+        {
+          "name": "point_x",
+          "type": "INT",
+          "widget": {
+            "name": "point_x"
+          },
+          "link": 48
+        },
+        {
+          "name": "point_y",
+          "type": "INT",
+          "widget": {
+            "name": "point_y"
+          },
+          "link": 49
+        }
+      ],
+      "outputs": [
+        {
+          "name": "debug_image",
+          "type": "IMAGE",
+          "links": [
+            52
+          ]
+        },
+        {
+          "name": "crop_image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "crop_x",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "crop_y",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "crop_size",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "scale_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TankComposite"
+      },
+      "widgets_values": [
+        556,
+        0,
+        0.65,
+        4,
+        1,
+        0,
+        0,
+        0,
+        -0.05,
+        -5,
+        0
+      ]
+    },
+    {
+      "id": 28,
+      "type": "PreviewImage",
+      "pos": [
+        21604.24745160667,
+        -4134.190649429983
+      ],
+      "size": [
+        932.5495782099424,
+        538.3474871950466
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 33,
+      "type": "PreviewImage",
+      "pos": [
+        21532.19844921997,
+        -4653.452584333856
+      ],
+      "size": [
+        932.5495782099424,
+        538.3474871950466
+      ],
+      "flags": {},
+      "order": 30,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 52
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      16,
+      0,
+      1,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      8,
+      0,
+      1,
+      1,
+      "PERSPECTIVE_MODEL"
+    ],
+    [
+      3,
+      16,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      7,
+      0,
+      4,
+      1,
+      "ROAD_QUAD_PAIRS"
+    ],
+    [
+      5,
+      5,
+      2,
+      4,
+      2,
+      "UNIDEPTH_DEPTH"
+    ],
+    [
+      6,
+      5,
+      4,
+      4,
+      3,
+      "UNIDEPTH_INTRINSICS"
+    ],
+    [
+      7,
+      16,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      2,
+      0,
+      5,
+      1,
+      "UNIDEPTH_MODEL"
+    ],
+    [
+      9,
+      4,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      22,
+      3,
+      7,
+      0,
+      "ROAD_QUAD_PAIRS"
+    ],
+    [
+      11,
+      5,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      23,
+      0,
+      10,
+      0,
+      "GRAVITY_FIELD"
+    ],
+    [
+      13,
+      23,
+      2,
+      10,
+      1,
+      "GRAVITY_FIELD"
+    ],
+    [
+      14,
+      23,
+      3,
+      10,
+      2,
+      "FLOAT"
+    ],
+    [
+      15,
+      12,
+      0,
+      11,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      10,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      17,
+      16,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      18,
+      14,
+      1,
+      15,
+      0,
+      "CLIP"
+    ],
+    [
+      19,
+      14,
+      0,
+      17,
+      0,
+      "MODEL"
+    ],
+    [
+      20,
+      16,
+      0,
+      17,
+      1,
+      "IMAGE"
+    ],
+    [
+      21,
+      15,
+      0,
+      17,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      22,
+      17,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
+      23,
+      1,
+      0,
+      19,
+      0,
+      "IMAGE"
+    ],
+    [
+      24,
+      22,
+      1,
+      20,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      17,
+      2,
+      21,
+      0,
+      "MASK"
+    ],
+    [
+      26,
+      16,
+      0,
+      21,
+      1,
+      "IMAGE"
+    ],
+    [
+      27,
+      17,
+      2,
+      22,
+      0,
+      "MASK"
+    ],
+    [
+      28,
+      16,
+      0,
+      22,
+      1,
+      "IMAGE"
+    ],
+    [
+      29,
+      7,
+      0,
+      23,
+      0,
+      "ROAD_QUAD_PAIRS"
+    ],
+    [
+      30,
+      1,
+      1,
+      23,
+      1,
+      "GRAVITY_FIELD"
+    ],
+    [
+      31,
+      1,
+      2,
+      23,
+      2,
+      "LATITUDE_FIELD"
+    ],
+    [
+      32,
+      16,
+      0,
+      23,
+      3,
+      "IMAGE"
+    ],
+    [
+      33,
+      27,
+      0,
+      23,
+      4,
+      "INT"
+    ],
+    [
+      34,
+      27,
+      1,
+      23,
+      5,
+      "INT"
+    ],
+    [
+      35,
+      25,
+      3,
+      23,
+      6,
+      "INT"
+    ],
+    [
+      36,
+      31,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      37,
+      7,
+      0,
+      25,
+      0,
+      "ROAD_QUAD_PAIRS"
+    ],
+    [
+      38,
+      17,
+      2,
+      25,
+      1,
+      "MASK"
+    ],
+    [
+      39,
+      13,
+      0,
+      25,
+      2,
+      "IMAGE"
+    ],
+    [
+      40,
+      23,
+      6,
+      26,
+      0,
+      "IMAGE"
+    ],
+    [
+      41,
+      25,
+      1,
+      27,
+      0,
+      "INSERTION_POINTS"
+    ],
+    [
+      43,
+      13,
+      0,
+      29,
+      0,
+      "IMAGE"
+    ],
+    [
+      44,
+      10,
+      0,
+      29,
+      1,
+      "IMAGE"
+    ],
+    [
+      45,
+      23,
+      7,
+      29,
+      2,
+      "ROAD_QUAD_PAIRS"
+    ],
+    [
+      46,
+      23,
+      2,
+      29,
+      3,
+      "GRAVITY_FIELD"
+    ],
+    [
+      47,
+      22,
+      3,
+      29,
+      4,
+      "ROAD_QUAD_PAIRS"
+    ],
+    [
+      48,
+      27,
+      0,
+      29,
+      5,
+      "INT"
+    ],
+    [
+      49,
+      27,
+      1,
+      29,
+      6,
+      "INT"
+    ],
+    [
+      50,
+      25,
+      0,
+      30,
+      0,
+      "IMAGE"
+    ],
+    [
+      51,
+      10,
+      0,
+      31,
+      0,
+      "IMAGE"
+    ],
+    [
+      52,
+      29,
+      0,
+      33,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.24304420967397997,
+      "offset": [
+        -15655.862568358127,
+        7785.236532496057
+      ]
+    },
+    "frontendVersion": "1.45.15"
+  },
+  "version": 0.4
+}

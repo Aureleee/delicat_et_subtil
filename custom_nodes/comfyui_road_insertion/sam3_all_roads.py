@@ -155,7 +155,7 @@ class SAM3AllRoads:
                     "tooltip": "Nombre maximum de routes à détecter. "
                                "Les routes sont triées par score décroissant."}),
                 "refine_iterations": ("INT", {
-                    "default": 2, "min": 0, "max": 5,
+                    "default": 4, "min": 0, "max": 5,
                     "tooltip": "Passes de raffinement SAM (0 = masques bruts du détecteur)."}),
             }
         }

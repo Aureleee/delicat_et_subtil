@@ -87,7 +87,10 @@ def _fit_line_side(pts, n_out, trim=0.05):
     direction = np.array([vx, vy])
     point     = np.array([x0, y0])
     projs = pts @ direction - float(np.dot(point, direction))
-    t_min, t_max = float(projs.min()), float(projs.max())
+    # Clipper aux percentiles 2/98 pour éviter que les extrémités déviantes
+    # ne fassent déborder le quad hors du masque
+    t_min = float(np.percentile(projs, 2))
+    t_max = float(np.percentile(projs, 98))
     ts = np.linspace(t_min, t_max, n_out)
     return (point + np.outer(ts, direction)).astype(np.float32), direction, point
 
@@ -103,26 +106,75 @@ def _perp_from_dir(dl, dr):
     return perp / (n + 1e-9)
 
 
-def _quads_from_sides(left_r, right_r, max_sub):
+def _quad_area(q):
+    pts = [q[0], q[1], q[2], q[3]]
+    n = len(pts)
+    a = 0.0
+    for i in range(n):
+        j = (i + 1) % n
+        a += pts[i][0] * pts[j][1]
+        a -= pts[j][0] * pts[i][1]
+    return abs(a) * 0.5
+
+
+def _is_valid_quad(q, min_side_px=3.0, min_width_px=0.0, min_area_px2=0.0,
+                   max_side_angle_deg=30.0):
+    lt, rt, rb, lb = q[0], q[1], q[2], q[3]
+    if np.allclose(lt, rt, atol=1.0) or np.allclose(lb, rb, atol=1.0):
+        return False
+    if np.allclose(lt, lb, atol=1.0) or np.allclose(rt, rb, atol=1.0):
+        return False
+    width_top = float(np.hypot(rt[0]-lt[0], rt[1]-lt[1]))
+    width_bot = float(np.hypot(rb[0]-lb[0], rb[1]-lb[1]))
+    height_l  = float(np.hypot(lb[0]-lt[0], lb[1]-lt[1]))
+    height_r  = float(np.hypot(rb[0]-rt[0], rb[1]-rt[1]))
+    if max(width_top, width_bot) < min_side_px:
+        return False
+    if max(height_l, height_r) < min_side_px:
+        return False
+    if min_width_px > 0 and (width_top + width_bot) / 2.0 < min_width_px:
+        return False
+    if min_area_px2 > 0 and _quad_area(q) < min_area_px2:
+        return False
+    if max_side_angle_deg < 90.0:
+        d_left  = (lb - lt).astype(np.float64)
+        d_right = (rb - rt).astype(np.float64)
+        n_l = np.linalg.norm(d_left); n_r = np.linalg.norm(d_right)
+        if n_l > 1e-6 and n_r > 1e-6:
+            cos_a = abs(float(np.dot(d_left / n_l, d_right / n_r)))
+            if cos_a < np.cos(np.radians(max_side_angle_deg)):
+                return False
+    return True
+
+
+def _quads_from_sides(left_r, right_r, max_sub, min_width_px=0.0):
     n = len(left_r)
     sub = max(1, min(max_sub, n - 1))
     idxs = np.linspace(0, n - 1, sub + 1, dtype=int)
-    return [
-        np.array([left_r[idxs[j]], right_r[idxs[j]],
-                  right_r[idxs[j+1]], left_r[idxs[j+1]]], dtype=np.float32)
-        for j in range(sub)
-    ]
+    result = []
+    for j in range(sub):
+        if idxs[j] == idxs[j+1]:
+            continue
+        q = np.array([left_r[idxs[j]], right_r[idxs[j]],
+                      right_r[idxs[j+1]], left_r[idxs[j+1]]], dtype=np.float32)
+        if _is_valid_quad(q, min_width_px=min_width_px):
+            result.append(q)
+    return result
 
 
-# ── Border points (for straight roads with fragments) ─────────────────────────
+# ── Border points ─────────────────────────────────────────────────────────────
 
 def _border_points_all_fragments(mask_np, min_area):
     mask_u8 = (mask_np > 0.5).astype(np.uint8) * 255
     contours, _ = cv2.findContours(mask_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    # Pour LINE FIT : seulement le plus grand fragment pour éviter les quads
+    # chevauchants issus de petits fragments disconnectés
+    valid = [c for c in contours if cv2.contourArea(c) >= min_area and len(c) >= 6]
+    if not valid:
+        return None, None
+    contours = [max(valid, key=cv2.contourArea)]
     all_left, all_right = [], []
     for cnt in contours:
-        if cv2.contourArea(cnt) < min_area or len(cnt) < 6:
-            continue
         pts = cnt.reshape(-1, 2).astype(np.float32)
         top_idx = int(np.argmin(pts[:, 1]))
         bot_idx = int(np.argmax(pts[:, 1]))
@@ -193,10 +245,7 @@ def _segment_straightness(left_r, right_r, i0, i1):
 # ── Curved road processor ─────────────────────────────────────────────────────
 
 def _process_curved(mask_np, sample_pts, dp_epsilon, max_sub, min_gap,
-                    min_area, straight_threshold, border_offset_px):
-    """
-    Composante principale (la plus grande) : DP + line fit par segment droit.
-    """
+                    min_area, straight_threshold, border_offset_px, min_quad_width_px=0):
     mask_u8 = (mask_np > 0.5).astype(np.uint8) * 255
     contours, _ = cv2.findContours(mask_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     valid = [c for c in contours if cv2.contourArea(c) >= min_area and len(c) >= 6]
@@ -246,18 +295,19 @@ def _process_curved(mask_np, sample_pts, dp_epsilon, max_sub, min_gap,
             sub  = max(1, min(max_sub, i1 - i0))
             idxs = np.linspace(i0, i1, sub + 1, dtype=int)
             for j in range(sub):
-                quads.append(np.array([
+                if idxs[j] == idxs[j+1]:
+                    continue
+                q = np.array([
                     left_r[idxs[j]],    right_r[idxs[j]],
                     right_r[idxs[j+1]], left_r[idxs[j+1]]
-                ], dtype=np.float32))
+                ], dtype=np.float32)
+                if _is_valid_quad(q, min_width_px=min_quad_width_px):
+                    quads.append(q)
 
     return quads, left_kps, right_kps
 
 
-# ── Hierarchical curved processing ────────────────────────────────────────────
-
 def _quads_to_coverage(quads, H, W):
-    """Masque binaire des pixels couverts par l'ensemble des quads."""
     cov = np.zeros((H, W), dtype=np.uint8)
     for quad in quads:
         cv2.fillPoly(cov, [quad.astype(np.int32)], 255)
@@ -266,15 +316,7 @@ def _quads_to_coverage(quads, H, W):
 
 def _process_curved_hierarchical(mask_np, n_passes, sample_pts, dp_epsilon,
                                   max_sub, min_gap, min_area,
-                                  straight_threshold, border_offset_px):
-    """
-    Passe hiérarchique :
-      Pass 1 → quads sur la composante principale → masque résiduel
-      Pass 2 → même algo sur le résiduel → nouveaux quads
-      ...
-    Chaque passe "explique" une portion de la route, la retire,
-    et laisse la suivante trouver ce qui reste.
-    """
+                                  straight_threshold, border_offset_px, min_quad_width_px=0):
     H, W = mask_np.shape
     current = mask_np.copy()
     all_quads, all_lkps, all_rkps = [], [], []
@@ -284,14 +326,12 @@ def _process_curved_hierarchical(mask_np, n_passes, sample_pts, dp_epsilon,
             break
         quads, lkps, rkps = _process_curved(
             current, sample_pts, dp_epsilon, max_sub, min_gap,
-            min_area, straight_threshold, border_offset_px)
+            min_area, straight_threshold, border_offset_px, min_quad_width_px)
         if not quads:
             break
         all_quads.extend(quads)
         all_lkps.extend(lkps)
         all_rkps.extend(rkps)
-
-        # Retirer les pixels couverts du masque courant
         cov = _quads_to_coverage(quads, H, W)
         current = current.copy()
         current[cov > 0] = 0.0
@@ -301,15 +341,18 @@ def _process_curved_hierarchical(mask_np, n_passes, sample_pts, dp_epsilon,
 
 # ── Drawing helpers ────────────────────────────────────────────────────────────
 
+def _quad_border_color(global_seg_idx):
+    hue = (global_seg_idx * 47) % 180
+    hsv = np.uint8([[[hue, 230, 255]]])
+    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0, 0]
+    return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
+
+
 def _draw_quad(canvas, quad, color, alpha, border_width, draw_fill=True,
-               mask_clip=None, clip_borders=False, mask_dilated=None):
-    """
-    Dessine un quad sur canvas.
-    mask_clip    : si fourni, le fill est restreint aux pixels du masque.
-    clip_borders : si True, les bords sont aussi clippés au masque dilaté.
-    """
+               mask_clip=None, clip_borders=False, mask_dilated=None,
+               border_color=None):
     pts = quad.astype(np.int32)
-    bright = tuple(min(255, int(c * 1.4)) for c in color)
+    edge_col = border_color if border_color is not None else tuple(min(255, int(c * 1.4)) for c in color)
     H, W = canvas.shape[:2]
 
     if draw_fill:
@@ -326,18 +369,15 @@ def _draw_quad(canvas, quad, color, alpha, border_width, draw_fill=True,
             cv2.fillPoly(overlay, [pts], color)
             canvas = cv2.addWeighted(canvas, 1 - alpha, overlay, alpha, 0)
 
-    # Bords gauche/droit
     for p0, p1 in [(pts[0], pts[3]), (pts[1], pts[2])]:
         if clip_borders and mask_dilated is not None:
-            # Dessiner la ligne sur un canvas temporaire puis masquer
             tmp = np.zeros((H, W), dtype=np.uint8)
             cv2.line(tmp, tuple(p0), tuple(p1), 255, border_width, cv2.LINE_AA)
             tmp[mask_dilated == 0] = 0
-            canvas[tmp > 0] = bright
+            canvas[tmp > 0] = edge_col
         else:
-            cv2.line(canvas, tuple(p0), tuple(p1), bright, border_width, cv2.LINE_AA)
+            cv2.line(canvas, tuple(p0), tuple(p1), edge_col, border_width, cv2.LINE_AA)
 
-    # Séparateurs haut/bas — fins, sans clipping
     cv2.line(canvas, tuple(pts[0]), tuple(pts[1]), (180, 180, 180), 1, cv2.LINE_AA)
     cv2.line(canvas, tuple(pts[3]), tuple(pts[2]), (180, 180, 180), 1, cv2.LINE_AA)
 
@@ -347,49 +387,37 @@ def _draw_quad(canvas, quad, color, alpha, border_width, draw_fill=True,
 # ── ComfyUI Node ───────────────────────────────────────────────────────────────
 
 class RoadQuadSegments:
-    """
-    [TEST] Segmente chaque route en quads.
-
-    Route DROITE  : régression linéaire globale + offset.
-    Route COURBÉE : DP point-par-point. Segments localement droits → line fit.
-
-    Deux images de debug :
-      debug_image  : fill coloré sur tout le quad
-      masked_debug : fill uniquement là où le masque confirme la route,
-                     lignes de bord toujours visibles sur toute la longueur
-    """
-
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "individual_masks": ("MASK",),
                 "straightness_threshold": ("FLOAT", {
-                    "default": 0.05, "min": 0.0, "max": 1.0, "step": 0.01,
-                    "tooltip": "Ratio s1/s0 PCA. En dessous = route droite (line fit global). "
-                               "Aussi utilisé par segment pour les routes courbées."}),
+                    "default": 0.03, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "dp_epsilon": ("FLOAT", {
-                    "default": 25.0, "min": 1.0, "max": 300.0, "step": 1.0,
-                    "tooltip": "Epsilon Douglas-Peucker pour les routes courbées."}),
+                    "default": 50.0, "min": 1.0, "max": 300.0, "step": 1.0}),
                 "max_segs_between_keypoints": ("INT", {
-                    "default": 2, "min": 1, "max": 20}),
+                    "default": 1, "min": 1, "max": 20}),
                 "sample_points": ("INT", {
                     "default": 300, "min": 50, "max": 2000}),
                 "min_keypoint_gap": ("INT", {
                     "default": 10, "min": 2, "max": 200}),
                 "border_offset_px": ("INT", {
-                    "default": 3, "min": -50, "max": 100,
-                    "tooltip": "Décalage des bords estimés vers l'extérieur (pixels). "
-                               "Compense le mask rétréci par rapport à la vraie route."}),
+                    "default": 3, "min": -50, "max": 100}),
                 "alpha": ("FLOAT", {
                     "default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "min_area_px": ("INT", {
                     "default": 200, "min": 10, "max": 100000}),
+                "min_road_area_ratio": ("FLOAT", {
+                    "default": 0.05, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "min_quad_width_px": ("INT", {
+                    "default": 10, "min": 0, "max": 500}),
+                "min_quad_area_px2": ("INT", {
+                    "default": 2000, "min": 0, "max": 500000}),
+                "max_side_angle_deg": ("FLOAT", {
+                    "default": 25.0, "min": 0.0, "max": 90.0, "step": 1.0}),
                 "n_passes": ("INT", {
-                    "default": 2, "min": 1, "max": 10,
-                    "tooltip": "Passes hiérarchiques. Pass 1 trouve la composante principale, "
-                               "pass 2 relance le même algo sur le masque résiduel (initial − déjà trouvé), "
-                               "etc. Permet de détecter tous les virages d'une route."}),
+                    "default": 2, "min": 1, "max": 10}),
             },
             "optional": {
                 "background_image": ("IMAGE",),
@@ -404,7 +432,10 @@ class RoadQuadSegments:
     def segment(self, individual_masks, straightness_threshold=0.05,
                 dp_epsilon=25.0, max_segs_between_keypoints=2,
                 sample_points=300, min_keypoint_gap=10, border_offset_px=3,
-                alpha=0.35, min_area_px=200, n_passes=2, background_image=None):
+                alpha=0.35, min_area_px=200, n_passes=2,
+                min_road_area_ratio=0.05, min_quad_width_px=10,
+                min_quad_area_px2=2000, max_side_angle_deg=25.0,
+                background_image=None):
 
         masks_t = individual_masks
         if masks_t.dim() == 2:
@@ -413,20 +444,26 @@ class RoadQuadSegments:
 
         masks_np = _resolve_overlap_pairwise(
             [masks_t[i].cpu().numpy() for i in range(N)])
+        masks_np = sorted(masks_np, key=lambda m: float((m > 0.5).sum()), reverse=True)
+
+        if masks_np and min_road_area_ratio > 0:
+            max_area = float((masks_np[0] > 0.5).sum())
+            masks_np = [m for m in masks_np
+                        if float((m > 0.5).sum()) >= min_road_area_ratio * max_area]
 
         if background_image is not None:
-            bg = (background_image[0].cpu().float().numpy() * 255
-                  ).astype(np.uint8)[..., :3].copy()
+            bg = (background_image[0].cpu().float().numpy() * 255).astype(np.uint8)[..., :3].copy()
         else:
             bg = np.zeros((H, W, 3), dtype=np.uint8)
             for m in masks_np:
                 bg[m > 0.5] = 50
 
-        canvas       = bg.copy()   # debug_image  : fill complet
-        canvas_mask  = bg.copy()   # masked_debug : fill clipé au masque
+        canvas      = bg.copy()
+        canvas_mask = bg.copy()
 
-        total_quads = 0
-        quad_pairs  = []   # liste de dicts pour UniDepthRoadWidth
+        total_quads     = 0
+        global_quad_idx = 0
+        quad_pairs      = []
 
         for road_idx, mask_np in enumerate(masks_np):
             color = _ROAD_COLORS[road_idx % len(_ROAD_COLORS)]
@@ -445,7 +482,7 @@ class RoadQuadSegments:
                     perp = _perp_from_dir(dl, dr)
                     left_r  = _offset_side(left_r,  -perp, border_offset_px)
                     right_r = _offset_side(right_r,  perp, border_offset_px)
-                quads    = _quads_from_sides(left_r, right_r, max_segs_between_keypoints)
+                quads    = _quads_from_sides(left_r, right_r, max_segs_between_keypoints, min_quad_width_px)
                 left_kps, right_kps = [], []
                 mode = f"LINE FIT  r={ratio:.3f}"
                 bw = 1
@@ -453,33 +490,39 @@ class RoadQuadSegments:
                 quads, left_kps, right_kps = _process_curved_hierarchical(
                     mask_np, n_passes, sample_points, dp_epsilon,
                     max_segs_between_keypoints, min_keypoint_gap, min_area_px,
-                    straightness_threshold, border_offset_px)
+                    straightness_threshold, border_offset_px, min_quad_width_px)
                 mode = f"DP×{n_passes}  r={ratio:.3f}"
                 bw = 1
 
+            quads = [q for q in quads
+                     if (min_quad_area_px2 <= 0 or _quad_area(q) >= min_quad_area_px2)
+                     and _is_valid_quad(q, max_side_angle_deg=max_side_angle_deg)]
+
             total_quads += len(quads)
 
-            # Masque dilaté pour le clipping des bords (masked_debug)
             mask_u8 = (mask_np > 0.5).astype(np.uint8) * 255
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
             mask_dilated = cv2.dilate(mask_u8, kernel)
 
             for seg_idx, quad in enumerate(quads):
                 quad_pairs.append({
-                    "quad":     quad,          # (4,2) float32 : [left_top, right_top, right_bot, left_bot]
+                    "quad":     quad,
                     "road_idx": road_idx,
                     "seg_idx":  seg_idx,
                     "color":    color,
                 })
                 shade_i = tuple(max(0, int(c * (0.55 + seg_idx * 0.04))) for c in color)
                 shade_i = tuple(min(255, v) for v in shade_i)
+                bcol = _quad_border_color(global_quad_idx)
+                global_quad_idx += 1
 
                 canvas      = _draw_quad(canvas,      quad, shade_i, alpha, bw,
                                          draw_fill=True,  mask_clip=None,
-                                         clip_borders=False)
+                                         clip_borders=False, border_color=bcol)
                 canvas_mask = _draw_quad(canvas_mask, quad, shade_i, alpha, bw,
                                          draw_fill=True,  mask_clip=mask_np,
-                                         clip_borders=True, mask_dilated=mask_dilated)
+                                         clip_borders=True, mask_dilated=mask_dilated,
+                                         border_color=bcol)
 
                 cx = int(quad[:, 0].mean())
                 cy = int(quad[:, 1].mean())
